@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>21 Second Space Challenge</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        #startScreen {
+            text-align: center;
+        }
+
+        #gameContainer {
+            width: 100%;
+            height: 100%;
+            background-color: black;
+            position: relative;
+            overflow: hidden;
+            display: none;
+        }
+
+        #rocket {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            font-size: 30px;
+            color: #00ff00;
+            transform: translateX(-50%);
+        }
+
+        .obstacle {
+            position: absolute;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .number {
+            color: #ff4444;
+            right: -60px;
+        }
+
+        .rock {
+            color: #888;
+            font-size: 30px;
+            top: -60px;
+        }
+
+        #timer {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            color: #00ff00;
+            z-index: 2;
+        }
+
+        #controls {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            z-index: 2;
+        }
+
+        .control-btn {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        #victoryMessage {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5em;
+            color: #ff69b4;
+            text-align: center;
+            text-shadow: 0 0 20px #ff1493;
+            opacity: 0;
+            display: none;
+            animation: victoryAnimation 3s forwards;
+            z-index: 999;
+        }
+
+        .explosion {
+            position: absolute;
+            font-size: 2em;
+            animation: explode 1s infinite;
+            opacity: 0;
+        }
+
+        @keyframes victoryAnimation {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            40% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        @keyframes explode {
+            0% { opacity: 0; transform: scale(0); }
+            50% { opacity: 1; transform: scale(1.5) rotate(180deg); }
+            100% { opacity: 0; transform: scale(2) rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="startScreen">
+        <h1>21 Second Space Challenge</h1>
+        <button id="startButton">Start Game</button>
+        <div id="instructions">
+            <p>Use arrow buttons to move</p>
+            <p>Avoid numbers 1-19 and falling rocks!</p>
+            <p>Survive for exactly 21 seconds!</p>
+        </div>
+    </div>
+
+    <div id="timer">Time: 0.0s</div>
+    <div id="gameContainer">
+        <div id="rocket">🚀</div>
+        <div id="controls">
+            <div class="control-btn" id="up">↑</div>
+            <div class="control-btn" id="left">←</div>
+            <div class="control-btn" id="right">→</div>
+            <div class="control-btn" id="down">↓</div>
+        </div>
+    </div>
+
+    <div id="victoryMessage">
+        <div class="explosion">💥</div>
+        <div class="explosion">🎉</div>
+        <div class="explosion">💣</div>
+        <div class="explosion">✨</div>
+        CONGRATULATIONSS!!<br>
+        THE SPACECRAFT LANDED ON EARTH<br>
+        Ojasvi has entered the earth realm,<br>
+        Happy Birthday Ojasvii!! 🎂🎁
+    </div>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const gameContainer = document.getElementById('gameContainer');
+        const rocket = document.getElementById('rocket');
+        const timerElement = document.getElementById('timer');
+        const startScreen = document.getElementById('startScreen');
+        
+        let rocketX = 50;
+        let rocketY = 20;
+        let gameActive = false;
+        let obstacles = [];
+        let startTime = 0;
+        let obstacleNumber = 1;
+        let moveSpeed = 0.8;
+        let isMoving = { up: false, down: false, left: false, right: false };
+        let gameMusic;
+        let passedObstacle19 = false;
+
+        startButton.addEventListener('click', () => {
+            gameMusic = new Audio('Happy Birthday To You Ji-(Mr-Jat.in).mp3');
+            gameMusic.loop = true;
+            gameMusic.play().catch(() => {
+                alert('Click anywhere to start music!');
+            });
+
+            startScreen.style.display = 'none';
+            gameContainer.style.display = 'block';
+            startGame();
+        });
+
+        function startGame() {
+            gameActive = true;
+            rocketX = 50;
+            rocketY = 20;
+            obstacleNumber = 1;
+            startTime = Date.now();
+            obstacles = [];
+            passedObstacle19 = false;
+            updateTimer();
+            spawnObstacles();
+            spawnRocks();
+            gameLoop();
+        }
+
+        function updateTimer() {
+            if (!gameActive) return;
+            const currentTime = (Date.now() - startTime) / 1000;
+            timerElement.textContent = `Time: ${currentTime.toFixed(1)}s`;
+            
+            if (currentTime >= 21 && passedObstacle19) {
+                gameWin();
+            } else {
+                requestAnimationFrame(updateTimer);
+            }
+        }
+
+        function spawnObstacles() {
+            if (!gameActive || obstacleNumber > 19) return;
+            
+            const obstacle = document.createElement('div');
+            obstacle.className = 'obstacle number';
+            obstacle.textContent = obstacleNumber;
+            obstacle.style.top = `${Math.random() * 80}%`;
+            
+            gameContainer.appendChild(obstacle);
+            obstacles.push({
+                element: obstacle,
+                x: 100,
+                y: parseFloat(obstacle.style.top),
+                number: obstacleNumber,
+                type: 'number',
+                speed: 0.5
+            });
+            
+            obstacleNumber++;
+            setTimeout(spawnObstacles, 1000);
+        }
+
+        function spawnRocks() {
+            if (!gameActive) return;
+            
+            const rock = document.createElement('div');
+            rock.className = 'obstacle rock';
+            rock.textContent = '🪨';
+            rock.style.left = `${Math.random() * 80}%`;
+            
+            gameContainer.appendChild(rock);
+            obstacles.push({
+                element: rock,
+                x: parseFloat(rock.style.left),
+                y: -10,
+                type: 'rock',
+                speed: 0.2
+            });
+            
+            setTimeout(spawnRocks, Math.random() * 2000 + 1000);
+        }
+
+        function gameLoop() {
+            if (!gameActive) return;
+            
+            if (isMoving.left) rocketX = Math.max(0, rocketX - moveSpeed);
+            if (isMoving.right) rocketX = Math.min(100, rocketX + moveSpeed);
+            if (isMoving.up) rocketY = Math.min(80, rocketY + moveSpeed);
+            if (isMoving.down) rocketY = Math.max(0, rocketY - moveSpeed);
+            
+            rocket.style.left = `${rocketX}%`;
+            rocket.style.bottom = `${rocketY}%`;
+            
+            obstacles.forEach((obstacle, index) => {
+                // Update positions
+                if (obstacle.type === 'number') {
+                    obstacle.x -= obstacle.speed;
+                    obstacle.element.style.right = `${obstacle.x}%`;
+                } else if (obstacle.type === 'rock') {
+                    obstacle.y += obstacle.speed;
+                    obstacle.element.style.top = `${obstacle.y}%`;
+                }
+
+                // Collision detection
+                const rocketRect = rocket.getBoundingClientRect();
+                const obstacleRect = obstacle.element.getBoundingClientRect();
+                
+                if (!(rocketRect.right < obstacleRect.left || 
+                      rocketRect.left > obstacleRect.right ||
+                      rocketRect.bottom < obstacleRect.top || 
+                      rocketRect.top > obstacleRect.bottom)) {
+                    gameOver();
+                }
+
+                // Remove off-screen obstacles
+                if ((obstacle.type === 'number' && obstacle.x < -10) || 
+                    (obstacle.type === 'rock' && obstacle.y > 100)) {
+                    obstacle.element.remove();
+                    obstacles.splice(index, 1);
+                    if (obstacle.type === 'number' && obstacle.number === 19) {
+                        passedObstacle19 = true;
+                    }
+                }
+            });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        const addControlListeners = (element, direction) => {
+            const startMoving = () => isMoving[direction] = true;
+            const stopMoving = () => isMoving[direction] = false;
+            
+            element.addEventListener('mousedown', startMoving);
+            element.addEventListener('mouseup', stopMoving);
+            element.addEventListener('mouseleave', stopMoving);
+            element.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                startMoving();
+            });
+            element.addEventListener('touchend', stopMoving);
+        };
+
+        addControlListeners(document.getElementById('up'), 'up');
+        addControlListeners(document.getElementById('down'), 'down');
+        addControlListeners(document.getElementById('left'), 'left');
+        addControlListeners(document.getElementById('right'), 'right');
+
+        function gameOver() {
+            gameActive = false;
+            gameMusic.pause();
+            alert(`Game Over! Reached number ${obstacleNumber-1}`);
+            location.reload();
+        }
+
+        function gameWin() {
+            gameActive = false;
+            const victoryMessage = document.getElementById('victoryMessage');
+            victoryMessage.style.display = 'block';
+            
+            document.querySelectorAll('.explosion').forEach(explosion => {
+                explosion.style.animation = 'explode 1s infinite';
+            });
+
+            setTimeout(() => {
+                location.reload();
+            }, 8000);
+        }
+    </script>
+</body>
+</html>
